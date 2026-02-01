@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+version = "0.1"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.github.javaparser:javaparser-core:3.26.4'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.1'
+}
+
+application {
+    mainClass = 'ai.indexer.Main'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}

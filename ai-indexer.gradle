@@ -1,0 +1,10 @@
+tasks.register('aiIndex', JavaExec) {
+    group = 'ai'
+    description = 'Builds query-friendly Jakarta EE graph into .repo-ai (JSONL + indices)'
+
+    dependsOn(':ai-indexer:classes')
+    classpath = project(':ai-indexer').sourceSets.main.runtimeClasspath
+    mainClass = 'ai.indexer.Main'
+    workingDir = rootDir
+    args rootDir.absolutePath
+}
