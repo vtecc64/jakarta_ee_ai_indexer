@@ -25,9 +25,13 @@ public final class Ids {
     }
 
     public static String normalizeTypeName(String typeName) {
-        if (typeName == null) return "";
+        if (typeName == null) {
+            return "";
+        }
         final String raw = typeName.trim();
-        if (raw.isEmpty()) return raw;
+        if (raw.isEmpty()) {
+            return raw;
+        }
 
         final StringBuilder sb = new StringBuilder(raw.length());
         int depth = 0;
@@ -38,10 +42,14 @@ public final class Ids {
                 continue;
             }
             if (c == '>') {
-                if (depth > 0) depth--;
+                if (depth > 0) {
+                    depth--;
+                }
                 continue;
             }
-            if (depth == 0) sb.append(c);
+            if (depth == 0) {
+                sb.append(c);
+            }
         }
 
         String normalized = sb.toString().trim();

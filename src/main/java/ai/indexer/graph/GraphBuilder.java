@@ -86,16 +86,26 @@ public final class GraphBuilder {
         final Map<String, EjbBindingAccumulator> ejbBindings = new HashMap<>();
         for (var e : scannedByModule.entrySet()) {
             for (var st : e.getValue()) {
-                if (!st.isEjbBean()) continue;
+                if (!st.isEjbBean()) {
+                    continue;
+                }
                 for (String implName : st.implementsRaw()) {
                     final String ifaceFqcn = symbols.resolveToFqcnIfPossible(implName, st.packageName());
-                    if (ifaceFqcn == null) continue;
+                    if (ifaceFqcn == null) {
+                        continue;
+                    }
 
                     final var ifaceType = byFqcn.get(ifaceFqcn);
-                    if (ifaceType == null || !ifaceType.isInterface()) continue;
-                    if (!ifaceType.isEjbLocal() && !ifaceType.isEjbRemote()) continue;
+                    if (ifaceType == null || !ifaceType.isInterface()) {
+                        continue;
+                    }
+                    if (!ifaceType.isEjbLocal() && !ifaceType.isEjbRemote()) {
+                        continue;
+                    }
 
-                    final var acc = ejbBindings.computeIfAbsent(ifaceFqcn, k -> new EjbBindingAccumulator(ifaceType.isEjbLocal(), ifaceType.isEjbRemote()));
+                    final var acc = ejbBindings.computeIfAbsent(
+                            ifaceFqcn,
+                            k -> new EjbBindingAccumulator(ifaceType.isEjbLocal(), ifaceType.isEjbRemote()));
                     acc.impls.add(st.fqcn());
                 }
             }
@@ -135,11 +145,19 @@ public final class GraphBuilder {
                 if (st.isEjbBean()) {
                     for (String implName : st.implementsRaw()) {
                         final String ifaceFqcn = symbols.resolveToFqcnIfPossible(implName, st.packageName());
-                        if (ifaceFqcn == null) continue;
+                        if (ifaceFqcn == null) {
+                            continue;
+                        }
                         final var ifaceType = byFqcn.get(ifaceFqcn);
-                        if (ifaceType == null) continue;
-                        if (ifaceType.isEjbLocal()) ejbLocal.add(Ids.typeId(ifaceFqcn));
-                        if (ifaceType.isEjbRemote()) ejbRemote.add(Ids.typeId(ifaceFqcn));
+                        if (ifaceType == null) {
+                            continue;
+                        }
+                        if (ifaceType.isEjbLocal()) {
+                            ejbLocal.add(Ids.typeId(ifaceFqcn));
+                        }
+                        if (ifaceType.isEjbRemote()) {
+                            ejbRemote.add(Ids.typeId(ifaceFqcn));
+                        }
                     }
                 }
                 Collections.sort(ejbLocal);
@@ -184,7 +202,9 @@ public final class GraphBuilder {
 
                 // Module of interface is based on typeIndex (if known); otherwise skip
                 final String ifaceModule = typeIndex.get(ifaceId);
-                if (ifaceModule == null || !ifaceModule.equals(moduleId)) continue;
+                if (ifaceModule == null || !ifaceModule.equals(moduleId)) {
+                    continue;
+                }
 
                 ejbIndex.put(ifaceId, moduleId);
 

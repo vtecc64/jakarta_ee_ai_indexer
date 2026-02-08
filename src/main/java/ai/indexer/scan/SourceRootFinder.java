@@ -34,15 +34,22 @@ public final class SourceRootFinder {
         for (var e : moduleDirsById.entrySet()) {
             final String moduleId = e.getKey();
             final Path moduleDir = e.getValue();
-            if (!Files.isDirectory(moduleDir)) continue;
+            if (!Files.isDirectory(moduleDir)) {
+                continue;
+            }
 
             final List<Path> roots = new ArrayList<>();
             Files.walkFileTree(moduleDir, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                     // Skip typical heavy dirs
-                    final String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-                    if (".git".equals(name) || ".idea".equals(name) || "build".equals(name) || "out".equals(name) || "node_modules".equals(name)) {
+                    final Path fileName = dir.getFileName();
+                    final String name = fileName != null ? fileName.toString() : "";
+                    if (".git".equals(name)
+                            || ".idea".equals(name)
+                            || "build".equals(name)
+                            || "out".equals(name)
+                            || "node_modules".equals(name)) {
                         return FileVisitResult.SKIP_SUBTREE;
                     }
 
@@ -65,11 +72,15 @@ public final class SourceRootFinder {
     private boolean looksLikeJavaSourceRoot(Path dir) {
         // .../src/main/java or .../src/test/java or .../src/<any>/java
         final int n = dir.getNameCount();
-        if (n < 3) return false;
+        if (n < 3) {
+            return false;
+        }
         final String last = dir.getName(n - 1).toString();
         final String mid = dir.getName(n - 2).toString();
         final String src = dir.getName(n - 3).toString();
-        if (!"java".equals(last) || !"src".equals(src) || mid.isBlank()) return false;
+        if (!"java".equals(last) || !"src".equals(src) || mid.isBlank()) {
+            return false;
+        }
         return includeTests || "main".equals(mid);
     }
 }

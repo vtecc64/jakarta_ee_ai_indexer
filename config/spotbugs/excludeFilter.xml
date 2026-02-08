@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+
+    <!--
+      We intentionally do NOT defensively copy certain collections for performance.
+      Contract: callers must treat passed-in collections as immutable after construction.
+      If you add defensive copies later, remove this suppression and let SpotBugs enforce it.
+    -->
+
+    <!-- Expose internal representation by storing externally mutable objects -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- also suppress the sibling pattern (returning internal representation) -->
+    <Match>
+      <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+</FindBugsFilter>

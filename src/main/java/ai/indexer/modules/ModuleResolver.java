@@ -37,7 +37,9 @@ public final class ModuleResolver {
             }
         }
 
-        if (best != null) return best;
+        if (best != null) {
+            return best;
+        }
 
         // Fallback: folder before "src"
         final Path rel = repoRoot.relativize(file.toAbsolutePath().normalize());

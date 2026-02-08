@@ -13,6 +13,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.NodeList;
+import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.AnnotationExpr;
@@ -72,10 +73,14 @@ public final class TypeScanner {
         try {
             final var res = parser.parse(file);
             final var cuOpt = res.getResult();
-            if (cuOpt.isEmpty()) return;
+            if (cuOpt.isEmpty()) {
+                return;
+            }
 
             final var cu = cuOpt.get();
-            final var pkg = cu.getPackageDeclaration().map(pd -> pd.getNameAsString()).orElse("");
+            final var pkg = cu.getPackageDeclaration().map(
+                    PackageDeclaration::getNameAsString)
+                    .orElse("");
             final var imports = cu.getImports();
             final var fileRel = repoRoot.relativize(file.toAbsolutePath().normalize())
                     .toString().replace('\\', '/');
@@ -93,10 +98,14 @@ public final class TypeScanner {
                 final var isEjbBean = ejbKind != null;
 
                 final var implementsRaw = new ArrayList<String>(cid.getImplementedTypes().size());
-                for (var t : cid.getImplementedTypes()) implementsRaw.add(t.getNameAsString());
+                for (var t : cid.getImplementedTypes()) {
+                    implementsRaw.add(t.getNameAsString());
+                }
 
                 final var extendsRaw = new ArrayList<String>(cid.getExtendedTypes().size());
-                for (var t : cid.getExtendedTypes()) extendsRaw.add(t.getNameAsString());
+                for (var t : cid.getExtendedTypes()) {
+                    extendsRaw.add(t.getNameAsString());
+                }
 
                 final var injectedFields = new ArrayList<InjectedField>();
 
@@ -105,9 +114,11 @@ public final class TypeScanner {
                     final var isEjb = hasAnno(fd, "EJB");
                     final var isCdi = hasAnno(fd, "Inject");
                     final var isPc = hasAnno(fd, "PersistenceContext");
-                    if (!isEjb && !isCdi && !isPc) continue;
-
+                    if (!isEjb && !isCdi && !isPc) {
+                        continue;
+                    }
                     final var via = isEjb ? "EJB" : (isCdi ? "CDI" : "JPA");
+
                     var typeRaw = Ids.normalizeTypeName(fd.getElementType().toString());
                     typeRaw = resolveImportedType(typeRaw, imports);
 
@@ -129,8 +140,9 @@ public final class TypeScanner {
                     final var isEjb = hasAnno(md, "EJB");
                     final var isCdi = hasAnno(md, "Inject");
                     final var isPc = hasAnno(md, "PersistenceContext");
-                    if (!isEjb && !isCdi && !isPc) continue;
-
+                    if (!isEjb && !isCdi && !isPc) {
+                        continue;
+                    }
                     final var via = isEjb ? "EJB" : (isCdi ? "CDI" : "JPA");
 
                     final var params = md.getParameters();
@@ -184,7 +196,9 @@ public final class TypeScanner {
         final var sb = new StringBuilder();
         sb.append(name).append('(');
         for (int i = 0; i < params.size(); i++) {
-            if (i > 0) sb.append(',');
+            if (i > 0) {
+                sb.append(',');
+            }
             sb.append(Ids.normalizeTypeName(params.get(i).getType().toString()));
         }
         sb.append(')');
@@ -192,17 +206,27 @@ public final class TypeScanner {
     }
 
     private static String safeMsg(String msg) {
-        if (msg == null) return "";
+        if (msg == null) {
+            return "";
+        }
         return msg.length() > 200 ? msg.substring(0, 200) + "..." : msg;
     }
 
     private static String resolveImportedType(String typeName, NodeList<ImportDeclaration> imports) {
-        if (typeName == null || typeName.isBlank()) return typeName;
-        if (typeName.indexOf('.') >= 0) return typeName;
-        if (isPrimitive(typeName)) return typeName;
+        if (typeName == null || typeName.isBlank()) {
+            return typeName;
+        }
+        if (typeName.indexOf('.') >= 0) {
+            return typeName;
+        }
+        if (isPrimitive(typeName)) {
+            return typeName;
+        }
 
         for (var imp : imports) {
-            if (imp.isStatic() || imp.isAsterisk()) continue;
+            if (imp.isStatic() || imp.isAsterisk()) {
+                continue;
+            }
             final String imported = imp.getNameAsString();
             final String simple = Ids.simpleNameOfFqcn(imported);
             if (simple.equals(typeName)) {
@@ -221,15 +245,23 @@ public final class TypeScanner {
 
     private static boolean hasAnno(NodeWithAnnotations<?> n, String simpleName) {
         for (AnnotationExpr a : n.getAnnotations()) {
-            if (simpleName.equals(annoSimpleName(a))) return true;
+            if (simpleName.equals(annoSimpleName(a))) {
+                return true;
+            }
         }
         return false;
     }
 
     private static String ejbKind(ClassOrInterfaceDeclaration cid) {
-        if (hasAnno(cid, "Stateless")) return "Stateless";
-        if (hasAnno(cid, "Stateful")) return "Stateful";
-        if (hasAnno(cid, "Singleton")) return "Singleton";
+        if (hasAnno(cid, "Stateless")) {
+            return "Stateless";
+        }
+        if (hasAnno(cid, "Stateful")) {
+            return "Stateful";
+        }
+        if (hasAnno(cid, "Singleton")) {
+            return "Singleton";
+        }
         return null;
     }
 
