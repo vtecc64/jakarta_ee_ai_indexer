@@ -26,6 +26,7 @@ import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 
 import ai.indexer.graph.SymbolTable;
 import ai.indexer.model.Ids;
+import ai.indexer.model.InjectionVia;
 
 public final class TypeScanner {
 
@@ -121,7 +122,7 @@ public final class TypeScanner {
                     if (!isEjb && !isCdi && !isPc) {
                         continue;
                     }
-                    final var via = isEjb ? "EJB" : (isCdi ? "CDI" : "JPA");
+                    final InjectionVia via = isEjb ? InjectionVia.EJB : (isCdi ? InjectionVia.CDI : InjectionVia.JPA);
 
                     var typeRaw = Ids.normalizeTypeName(fd.getElementType().toString());
                     typeRaw = resolveImportedType(typeRaw, imports);
@@ -147,7 +148,7 @@ public final class TypeScanner {
                     if (!isEjb && !isCdi && !isPc) {
                         continue;
                     }
-                    final var via = isEjb ? "EJB" : (isCdi ? "CDI" : "JPA");
+                    final InjectionVia via = isEjb ? InjectionVia.EJB : (isCdi ? InjectionVia.CDI : InjectionVia.JPA);
 
                     final var params = md.getParameters();
                     if (params.isEmpty()) {
@@ -304,7 +305,7 @@ public final class TypeScanner {
         return lastDot >= 0 ? n.substring(lastDot + 1) : n;
     }
 
-    public record InjectedField(String fieldName, String fieldTypeRaw, String via) {
+    public record InjectedField(String fieldName, String fieldTypeRaw, InjectionVia via) {
     }
 
     public record ScannedInjection(
@@ -313,7 +314,7 @@ public final class TypeScanner {
             String memberKind,   // field | method
             String member,       // fieldName | methodSignature
             String injectedTypeRaw,
-            String via           // EJB | CDI | JPA
+            InjectionVia via     // EJB | CDI | JPA
     ) {
     }
 

@@ -17,6 +17,6 @@ public record InjectLine(
         String memberKind,  // "field" | "method"
         String member,      // fieldName OR methodSignature-ish (e.g. setX(Type))
         String type,        // t:<fqcn> (or t:<simple> if unresolved)
-        String via          // "EJB" | "CDI" | "JPA"
+        InjectionVia via    // "EJB" | "CDI" | "JPA"
 ) {
 }

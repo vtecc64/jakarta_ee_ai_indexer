@@ -9,7 +9,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -19,6 +18,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import ai.indexer.graph.Graph;
 
 public final class GraphWriter {
+
+    public static final String SCHEMA_VERSION = "ai-graph/v2";
 
     private final Path outDir;
     private final ObjectMapper jsonMapper;
@@ -78,12 +79,12 @@ public final class GraphWriter {
         );
 
         // Write global indices
-        writeJson(outDir.resolve("types.index.json"), sortedByKey(graph.typeIndex()));
-        writeJson(outDir.resolve("ejb.index.json"), sortedByKey(graph.ejbIndex()));
+        writeJson(outDir.resolve("types.index.json"), new TreeMap<>(graph.typeIndex()));
+        writeJson(outDir.resolve("ejb.index.json"), new TreeMap<>(graph.ejbIndex()));
 
         // Master index
         final MasterIndex idx = new MasterIndex(
-                "ai-graph/v2",
+                SCHEMA_VERSION,
                 generatedAt,
                 moduleEntries,
                 "types.index.json",
@@ -103,18 +104,12 @@ public final class GraphWriter {
         try (BufferedWriter bw = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
 
-            for (int i = 0; i < lines.size(); i++) {
-                final String json = jsonlMapper.writeValueAsString(lines.get(i));
+            for (T line : lines) {
+                final String json = jsonlMapper.writeValueAsString(line);
                 bw.write(json);
                 bw.newLine();
             }
         }
-    }
-
-    private static Map<String, String> sortedByKey(Map<String, String> in) {
-        final Map<String, String> out = new TreeMap<>();
-        out.putAll(in);
-        return out;
     }
 
     // --- index records (written as JSON, not JSONL) ---

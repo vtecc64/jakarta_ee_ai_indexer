@@ -76,42 +76,8 @@ public final class GraphBuilder {
         final Map<String, String> typeIndex = new HashMap<>();
         final Map<String, String> ejbIndex = new HashMap<>();
 
-        // Precompute EJB interface flags and bean->interfaces mapping
-        final Map<String, TypeScanner.ScannedType> byFqcn = new HashMap<>();
-        for (var e : scannedByModule.entrySet()) {
-            for (var st : e.getValue()) {
-                byFqcn.put(st.fqcn(), st);
-            }
-        }
-
-        // Build EJB bindings: ifaceFqcn -> impl bean fqcn list + local/remote flags
-        final Map<String, EjbBindingAccumulator> ejbBindings = new HashMap<>();
-        for (var e : scannedByModule.entrySet()) {
-            for (var st : e.getValue()) {
-                if (!st.isEjbBean()) {
-                    continue;
-                }
-                for (String implName : st.implementsRaw()) {
-                    final String ifaceFqcn = symbols.resolveToFqcnIfPossible(implName, st.packageName());
-                    if (ifaceFqcn == null) {
-                        continue;
-                    }
-
-                    final var ifaceType = byFqcn.get(ifaceFqcn);
-                    if (ifaceType == null || !ifaceType.isInterface()) {
-                        continue;
-                    }
-                    if (!ifaceType.isEjbLocal() && !ifaceType.isEjbRemote()) {
-                        continue;
-                    }
-
-                    final var acc = ejbBindings.computeIfAbsent(
-                            ifaceFqcn,
-                            k -> new EjbBindingAccumulator(ifaceType.isEjbLocal(), ifaceType.isEjbRemote()));
-                    acc.impls.add(st.fqcn());
-                }
-            }
-        }
+        final Map<String, TypeScanner.ScannedType> byFqcn = indexByFqcn(scannedByModule);
+        final Map<String, EjbBindingAccumulator> ejbBindings = buildEjbBindings(scannedByModule, byFqcn, symbols);
 
         // Per module: build JSONL lines
         final List<String> moduleIds = new ArrayList<>(scannedByModule.keySet());
@@ -126,67 +92,7 @@ public final class GraphBuilder {
             for (var st : types) {
                 final String typeId = Ids.typeId(st.fqcn());
                 typeIndex.put(typeId, moduleId);
-
-                final List<String> implIds = new ArrayList<>(st.implementsRaw().size());
-                for (String n : st.implementsRaw()) {
-                    implIds.add(symbols.toTypeId(n, st.packageName()));
-                }
-                Collections.sort(implIds);
-
-                final List<String> extIds = new ArrayList<>(st.extendsRaw().size());
-                for (String n : st.extendsRaw()) {
-                    extIds.add(symbols.toTypeId(n, st.packageName()));
-                }
-                Collections.sort(extIds);
-
-                final String ejbKind = st.ejbKindLower(); // stateless/stateful/singleton or null
-
-                // For beans: resolve which EJB interfaces are local/remote (from scanned interface annotations)
-                final List<String> ejbLocal = new ArrayList<>();
-                final List<String> ejbRemote = new ArrayList<>();
-                if (st.isEjbBean()) {
-                    for (String implName : st.implementsRaw()) {
-                        final String ifaceFqcn = symbols.resolveToFqcnIfPossible(implName, st.packageName());
-                        if (ifaceFqcn == null) {
-                            continue;
-                        }
-                        final var ifaceType = byFqcn.get(ifaceFqcn);
-                        if (ifaceType == null) {
-                            continue;
-                        }
-                        if (ifaceType.isEjbLocal()) {
-                            ejbLocal.add(Ids.typeId(ifaceFqcn));
-                        }
-                        if (ifaceType.isEjbRemote()) {
-                            ejbRemote.add(Ids.typeId(ifaceFqcn));
-                        }
-                    }
-                }
-                Collections.sort(ejbLocal);
-                Collections.sort(ejbRemote);
-
-                final List<String> injectFieldIds = new ArrayList<>(st.injectedFields().size());
-                for (var f : st.injectedFields()) {
-                    injectFieldIds.add(Ids.fieldId(st.fqcn(), f.fieldName()));
-                }
-                Collections.sort(injectFieldIds);
-
-                final List<String> injectMemberIds = new ArrayList<>(
-                        injectMembersByType.getOrDefault(st.fqcn(), Set.of()));
-                Collections.sort(injectMemberIds);
-
-                typeLines.add(new TypeLine(
-                        typeId,
-                        st.isInterface() ? "interface" : "class",
-                        st.fileRel(),
-                        implIds,
-                        extIds,
-                        ejbKind,
-                        ejbLocal,
-                        ejbRemote,
-                        injectFieldIds,
-                        injectMemberIds
-                ));
+                typeLines.add(toTypeLine(st, symbols, byFqcn, injectMembersByType));
             }
 
             // Injection edges for this module (field + method injections; EJB/CDI/JPA)
@@ -250,5 +156,119 @@ public final class GraphBuilder {
             this.local = local;
             this.remote = remote;
         }
+    }
+
+    private static Map<String, TypeScanner.ScannedType> indexByFqcn(
+            Map<String, List<TypeScanner.ScannedType>> scannedByModule) {
+        final Map<String, TypeScanner.ScannedType> byFqcn = new HashMap<>();
+        for (var e : scannedByModule.entrySet()) {
+            for (var st : e.getValue()) {
+                byFqcn.put(st.fqcn(), st);
+            }
+        }
+        return byFqcn;
+    }
+
+    private static Map<String, EjbBindingAccumulator> buildEjbBindings(
+            Map<String, List<TypeScanner.ScannedType>> scannedByModule,
+            Map<String, TypeScanner.ScannedType> byFqcn,
+            SymbolTable symbols) {
+
+        final Map<String, EjbBindingAccumulator> ejbBindings = new HashMap<>();
+        for (var e : scannedByModule.entrySet()) {
+            for (var st : e.getValue()) {
+                if (!st.isEjbBean()) {
+                    continue;
+                }
+                for (String implName : st.implementsRaw()) {
+                    final String ifaceFqcn = symbols.resolveToFqcnIfPossible(implName, st.packageName());
+                    if (ifaceFqcn == null) {
+                        continue;
+                    }
+
+                    final var ifaceType = byFqcn.get(ifaceFqcn);
+                    if (ifaceType == null || !ifaceType.isInterface()) {
+                        continue;
+                    }
+                    if (!ifaceType.isEjbLocal() && !ifaceType.isEjbRemote()) {
+                        continue;
+                    }
+
+                    final var acc = ejbBindings.computeIfAbsent(
+                            ifaceFqcn,
+                            k -> new EjbBindingAccumulator(ifaceType.isEjbLocal(), ifaceType.isEjbRemote()));
+                    acc.impls.add(st.fqcn());
+                }
+            }
+        }
+        return ejbBindings;
+    }
+
+    private static TypeLine toTypeLine(
+            TypeScanner.ScannedType st,
+            SymbolTable symbols,
+            Map<String, TypeScanner.ScannedType> byFqcn,
+            Map<String, Set<String>> injectMembersByType) {
+
+        final String typeId = Ids.typeId(st.fqcn());
+        final List<String> implIds = resolveTypeIds(st.implementsRaw(), symbols, st.packageName());
+        final List<String> extIds = resolveTypeIds(st.extendsRaw(), symbols, st.packageName());
+        final String ejbKind = st.ejbKindLower(); // stateless/stateful/singleton or null
+
+        // For beans: resolve which EJB interfaces are local/remote (from scanned interface annotations)
+        final List<String> ejbLocal = new ArrayList<>();
+        final List<String> ejbRemote = new ArrayList<>();
+        if (st.isEjbBean()) {
+            for (String implName : st.implementsRaw()) {
+                final String ifaceFqcn = symbols.resolveToFqcnIfPossible(implName, st.packageName());
+                if (ifaceFqcn == null) {
+                    continue;
+                }
+                final var ifaceType = byFqcn.get(ifaceFqcn);
+                if (ifaceType == null) {
+                    continue;
+                }
+                if (ifaceType.isEjbLocal()) {
+                    ejbLocal.add(Ids.typeId(ifaceFqcn));
+                }
+                if (ifaceType.isEjbRemote()) {
+                    ejbRemote.add(Ids.typeId(ifaceFqcn));
+                }
+            }
+        }
+        Collections.sort(ejbLocal);
+        Collections.sort(ejbRemote);
+
+        final List<String> injectFieldIds = new ArrayList<>(st.injectedFields().size());
+        for (var f : st.injectedFields()) {
+            injectFieldIds.add(Ids.fieldId(st.fqcn(), f.fieldName()));
+        }
+        Collections.sort(injectFieldIds);
+
+        final List<String> injectMemberIds = new ArrayList<>(
+                injectMembersByType.getOrDefault(st.fqcn(), Set.of()));
+        Collections.sort(injectMemberIds);
+
+        return new TypeLine(
+                typeId,
+                st.isInterface() ? "interface" : "class",
+                st.fileRel(),
+                implIds,
+                extIds,
+                ejbKind,
+                ejbLocal,
+                ejbRemote,
+                injectFieldIds,
+                injectMemberIds
+        );
+    }
+
+    private static List<String> resolveTypeIds(List<String> raw, SymbolTable symbols, String packageName) {
+        final List<String> out = new ArrayList<>(raw.size());
+        for (String n : raw) {
+            out.add(symbols.toTypeId(n, packageName));
+        }
+        Collections.sort(out);
+        return out;
     }
 }
