@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -16,6 +17,7 @@ import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 
@@ -72,6 +74,11 @@ public final class TypeScanner {
 
         try {
             final var res = parser.parse(file);
+            if (!res.getProblems().isEmpty()) {
+                parseWarnings++;
+                final String msg = safeMsg(res.getProblems().getFirst().getMessage());
+                System.err.println("WARN: parse problems in " + file + " -> " + msg);
+            }
             final var cuOpt = res.getResult();
             if (cuOpt.isEmpty()) {
                 return;
@@ -87,8 +94,7 @@ public final class TypeScanner {
 
             for (var cid : cu.findAll(ClassOrInterfaceDeclaration.class)) {
 
-                final var fqcn = cid.getFullyQualifiedName()
-                        .orElse(pkg.isEmpty() ? cid.getNameAsString() : pkg + "." + cid.getNameAsString());
+                final var fqcn = resolveFqcn(cid, pkg);
 
                 final var isInterface = cid.isInterface();
                 final var ejbLocal = isInterface && hasAnno(cid, "Local");
@@ -189,6 +195,30 @@ public final class TypeScanner {
             System.err.println("WARN: failed to parse " + file + " -> "
                     + ex.getClass().getSimpleName() + ": " + safeMsg(ex.getMessage()));
         }
+    }
+
+    private static String resolveFqcn(ClassOrInterfaceDeclaration cid, String pkg) {
+        final var direct = cid.getFullyQualifiedName();
+        if (direct.isPresent()) {
+            return direct.get();
+        }
+        final String nested = nestedTypeName(cid);
+        if (pkg == null || pkg.isEmpty()) {
+            return nested;
+        }
+        return pkg + "." + nested;
+    }
+
+    private static String nestedTypeName(ClassOrInterfaceDeclaration cid) {
+        final List<String> parts = new ArrayList<>();
+        parts.add(cid.getNameAsString());
+        var parent = cid.getParentNode().orElse(null);
+        while (parent instanceof TypeDeclaration<?> td) {
+            parts.add(td.getNameAsString());
+            parent = td.getParentNode().orElse(null);
+        }
+        Collections.reverse(parts);
+        return String.join(".", parts);
     }
 
     private static String methodSignature(String name, NodeList<Parameter> params) {

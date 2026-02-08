@@ -47,8 +47,12 @@ public final class SourceRootFinder {
                     final String name = fileName != null ? fileName.toString() : "";
                     if (".git".equals(name)
                             || ".idea".equals(name)
+                            || ".gradle".equals(name)
                             || "build".equals(name)
+                            || "buildSrc".equals(name)
+                            || "dist".equals(name)
                             || "out".equals(name)
+                            || "target".equals(name)
                             || "node_modules".equals(name)) {
                         return FileVisitResult.SKIP_SUBTREE;
                     }

@@ -22,11 +22,14 @@ import java.util.regex.Pattern;
  */
 public final class ModuleLayout {
 
-    // Matches ':moduleName' within single quotes, e.g. ':contentmanager'
-    private static final Pattern MODULE_TOKEN = Pattern.compile("':([^']+)'");
+    // Matches ":moduleName" or ':moduleName' within include blocks (Groovy or Kotlin DSL).
+    private static final Pattern MODULE_TOKEN = Pattern.compile("[\"']\\:([^\"']+)[\"']");
 
-    private static final Pattern PROJECT_DIR = Pattern.compile(
+    private static final Pattern PROJECT_DIR_GROOVY = Pattern.compile(
             "project\\('\\:([^']+)'\\)\\.projectDir\\s*=\\s*new\\s+File\\(settingsDir,\\s*'([^']+)'\\)"
+    );
+    private static final Pattern PROJECT_DIR_KOTLIN = Pattern.compile(
+            "project\\(\"\\:([^\"]+)\"\\)\\.projectDir\\s*=\\s*file\\(\"([^\"]+)\"\\)"
     );
 
     private final Path repoRoot;
@@ -40,7 +43,9 @@ public final class ModuleLayout {
     public static ModuleLayout load(Path repoRoot) throws IOException {
         Objects.requireNonNull(repoRoot, "repoRoot");
         final Path settings = repoRoot.resolve("settings.gradle");
-        if (!Files.exists(settings)) {
+        final Path settingsKts = repoRoot.resolve("settings.gradle.kts");
+        final Path settingsFile = Files.exists(settings) ? settings : (Files.exists(settingsKts) ? settingsKts : null);
+        if (settingsFile == null) {
             return new ModuleLayout(repoRoot, Map.of());
         }
 
@@ -48,7 +53,7 @@ public final class ModuleLayout {
         final Set<String> moduleIds = new LinkedHashSet<>();
         final Map<String, String> projectDirs = new HashMap<>();
 
-        try (BufferedReader br = Files.newBufferedReader(settings, StandardCharsets.UTF_8)) {
+        try (BufferedReader br = Files.newBufferedReader(settingsFile, StandardCharsets.UTF_8)) {
             String line;
             while ((line = br.readLine()) != null) {
 
@@ -59,10 +64,16 @@ public final class ModuleLayout {
                 }
 
                 // 2) Collect explicit projectDir mappings
-                final Matcher pd = PROJECT_DIR.matcher(line);
-                if (pd.find()) {
-                    final String moduleId = pd.group(1);
-                    final String dir = pd.group(2);
+                final Matcher groovy = PROJECT_DIR_GROOVY.matcher(line);
+                if (groovy.find()) {
+                    final String moduleId = groovy.group(1);
+                    final String dir = groovy.group(2);
+                    projectDirs.put(moduleId, dir);
+                }
+                final Matcher kotlin = PROJECT_DIR_KOTLIN.matcher(line);
+                if (kotlin.find()) {
+                    final String moduleId = kotlin.group(1);
+                    final String dir = kotlin.group(2);
                     projectDirs.put(moduleId, dir);
                 }
             }
