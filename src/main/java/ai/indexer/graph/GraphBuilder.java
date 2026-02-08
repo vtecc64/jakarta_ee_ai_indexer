@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import ai.indexer.model.EjbBindingLine;
 import ai.indexer.model.Ids;
@@ -59,13 +61,13 @@ public final class GraphBuilder {
 
         symbols.finalizeIndex();
 
-        final Map<String, List<String>> injectMembersByType = new HashMap<>();
+        final Map<String, Set<String>> injectMembersByType = new HashMap<>();
         for (var injections : injectionsByModule.values()) {
             for (var si : injections) {
                 final String memberId = "field".equals(si.memberKind())
                         ? Ids.fieldId(si.fromFqcn(), si.member())
                         : Ids.methodId(si.fromFqcn(), si.member());
-                injectMembersByType.computeIfAbsent(si.fromFqcn(), k -> new ArrayList<>()).add(memberId);
+                injectMembersByType.computeIfAbsent(si.fromFqcn(), k -> new HashSet<>()).add(memberId);
             }
         }
 
@@ -117,7 +119,7 @@ public final class GraphBuilder {
 
         for (String moduleId : moduleIds) {
             final List<TypeLine> typeLines = new ArrayList<>();
-            final List<InjectLine> injectLines = new ArrayList<>();
+            final Set<InjectLine> injectLineSet = new HashSet<>();
             final List<EjbBindingLine> ejbLines = new ArrayList<>();
 
             final List<TypeScanner.ScannedType> types = scannedByModule.getOrDefault(moduleId, List.of());
@@ -170,7 +172,7 @@ public final class GraphBuilder {
                 Collections.sort(injectFieldIds);
 
                 final List<String> injectMemberIds = new ArrayList<>(
-                        injectMembersByType.getOrDefault(st.fqcn(), List.of()));
+                        injectMembersByType.getOrDefault(st.fqcn(), Set.of()));
                 Collections.sort(injectMemberIds);
 
                 typeLines.add(new TypeLine(
@@ -192,7 +194,7 @@ public final class GraphBuilder {
             for (var si : inj) {
                 final var from = Ids.typeId(si.fromFqcn());
                 final var type = symbols.toTypeId(si.injectedTypeRaw(), si.fromPackageName());
-                injectLines.add(new InjectLine(from, si.memberKind(), si.member(), type, si.via()));
+                injectLineSet.add(new InjectLine(from, si.memberKind(), si.member(), type, si.via()));
             }
 
             // EJB bindings for this module: only those interfaces that belong to this module
@@ -220,6 +222,7 @@ public final class GraphBuilder {
             }
 
             typeLines.sort(Comparator.comparing(TypeLine::id));
+            final List<InjectLine> injectLines = new ArrayList<>(injectLineSet);
             injectLines.sort(Comparator.comparing(InjectLine::from)
                     .thenComparing(InjectLine::memberKind)
                     .thenComparing(InjectLine::member)

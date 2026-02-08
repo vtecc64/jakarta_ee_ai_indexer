@@ -21,7 +21,7 @@ public final class SymbolTable {
     public void registerType(String fqcn) {
         allFqcns.add(fqcn);
         final String simple = Ids.simpleNameOfFqcn(fqcn);
-        simpleCounts.put(simple, simpleCounts.getOrDefault(simple, 0) + 1);
+        simpleCounts.merge(simple, 1, Integer::sum);
     }
 
     public void finalizeIndex() {

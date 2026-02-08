@@ -1,8 +1,11 @@
 package ai.indexer.scan;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,20 +54,15 @@ public final class TypeScanner {
         final var types = scannedByModule.computeIfAbsent(moduleId, k -> new ArrayList<>());
         final var injections = injectionsByModule.computeIfAbsent(moduleId, k -> new ArrayList<>());
 
-        try (var paths = Files.walk(sourceRoot)) {
-            final var javaFiles = paths
-                    .filter(Files::isRegularFile)
-                    .filter(path -> {
-                        final var name = path.getFileName() != null ? path.getFileName().toString() : "";
-                        return name.endsWith(".java");
-                    })
-                    .sorted()
-                    .toList();
-
-            for (var file : javaFiles) {
-                parseFile(file, types, injections, symbols);
+        Files.walkFileTree(sourceRoot, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                if (attrs.isRegularFile() && isJavaFile(file)) {
+                    parseFile(file, types, injections, symbols);
+                }
+                return FileVisitResult.CONTINUE;
             }
-        }
+        });
     }
 
     private void parseFile(Path file,
@@ -240,6 +238,11 @@ public final class TypeScanner {
             return "";
         }
         return msg.length() > 200 ? msg.substring(0, 200) + "..." : msg;
+    }
+
+    private static boolean isJavaFile(Path path) {
+        final var name = path.getFileName() != null ? path.getFileName().toString() : "";
+        return name.endsWith(".java");
     }
 
     private static String resolveImportedType(String typeName, NodeList<ImportDeclaration> imports) {
